@@ -1,0 +1,1813 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Portal de Importação de Dados — Coligadas</title>
+
+  <!-- Fonte Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+
+  <!-- Tailwind CSS via CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+          },
+          colors: {
+            navy: {
+              950: '#070b14',
+              900: '#0f172a',
+              800: '#1e293b',
+              700: '#334155',
+            },
+            royal: {
+              600: '#2563eb',
+              700: '#1d4ed8',
+            },
+            emerald: {
+              600: '#0d9488',
+              700: '#0f766e',
+            }
+          }
+        }
+      }
+    };
+  </script>
+
+  <!-- SDK Oficial Supabase JS v2 -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <!-- SheetJS (xlsx) para leitura e geração de planilhas Excel (.xlsx, .xls) e CSV no navegador -->
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+
+  <style>
+    body {
+      background-color: #f8fafc;
+      color: #0f172a;
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* Destaque visual durante o arraste de arquivo (Drag & Drop) */
+    .dropzone-active {
+      border-color: #0d9488 !important;
+      background-color: #f0fdfa !important;
+      transform: scale(1.005);
+    }
+
+    /* Barra de rolagem horizontal discreta para tabelas */
+    .table-scroll::-webkit-scrollbar {
+      height: 8px;
+      width: 8px;
+    }
+    .table-scroll::-webkit-scrollbar-track {
+      background: #f1f5f9;
+      border-radius: 8px;
+    }
+    .table-scroll::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 8px;
+    }
+    .table-scroll::-webkit-scrollbar-thumb:hover {
+      background: #94a3b8;
+    }
+
+    @keyframes spinFast {
+      to { transform: rotate(360deg); }
+    }
+    .animate-spin-fast {
+      animation: spinFast 0.75s linear infinite;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between">
+
+  <!-- =======================================================================
+       CABEÇALHO CORPORATIVO SUPERIOR
+       ======================================================================= -->
+  <header class="bg-[#0f172a] text-white border-b border-slate-800 sticky top-0 z-40 shadow-md">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3.5 flex flex-wrap items-center justify-between gap-3">
+      <!-- Identidade do Portal -->
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-[#2563eb] to-[#0d9488] flex items-center justify-center font-extrabold text-white shadow-sm shrink-0">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+            <ellipse cx="12" cy="5" rx="9" ry="3"></ellipse>
+            <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path>
+            <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path>
+          </svg>
+        </div>
+        <div>
+          <div class="flex items-center gap-2 flex-wrap">
+            <h1 class="text-base sm:text-lg font-extrabold tracking-tight text-white leading-tight">
+              Portal de Importação de Dados — Coligadas
+            </h1>
+            <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-[#0d9488]/20 text-teal-300 border border-teal-500/30">
+              Ambiente de Produção
+            </span>
+          </div>
+          <p class="text-xs text-slate-400 hidden sm:block">
+            Repositório Central de Dados • Ingestão Padronizada com Auditoria e Conformidade LGPD
+          </p>
+        </div>
+      </div>
+
+      <!-- Crachá do Operador Logado e Botão Sair (Exibidos após autenticação) -->
+      <div class="flex items-center gap-2.5 flex-wrap">
+        <div id="userBadgeContainer" class="hidden items-center gap-2.5 bg-slate-800/90 border border-slate-700 rounded-xl px-3 py-1.5">
+          <div id="userAvatarInitials" class="w-7 h-7 rounded-lg bg-[#2563eb] text-white font-bold text-xs flex items-center justify-center shrink-0">
+            OP
+          </div>
+          <div class="text-left leading-tight">
+            <div class="flex items-center gap-1.5 flex-wrap">
+              <span id="loggedUserEmail" class="text-xs font-bold text-white">operador@coligada.com.br</span>
+              <span id="loggedUserUuid" title="Identificador único (UUID) do operador" class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-900 text-slate-300 border border-slate-700">
+                UUID: --------
+              </span>
+            </div>
+            <div class="flex items-center gap-1 text-[10px] font-bold text-teal-400 mt-0.5">
+              <svg class="w-3 h-3 shrink-0" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                <polyline points="9 12 11 14 15 10"></polyline>
+              </svg>
+              <span>Auditoria RLS Ativa</span>
+            </div>
+          </div>
+        </div>
+
+        <button
+          type="button"
+          id="logoutBtn"
+          class="hidden items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-rose-600/90 hover:bg-rose-600 text-white transition shadow-sm"
+          title="Encerrar sessão com segurança"
+        >
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+            <polyline points="16 17 21 12 16 7"></polyline>
+            <line x1="21" y1="12" x2="9" y2="12"></line>
+          </svg>
+          <span>Sair</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- =======================================================================
+       CONTEÚDO PRINCIPAL
+       ======================================================================= -->
+  <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+
+    <!-- ALERTA AMIGÁVEL CASO AS CONSTANTES DE PRODUÇÃO AINDA SEJAM PLACEHOLDERS -->
+    <div id="placeholderConfigAlert" class="hidden max-w-2xl mx-auto mb-6 bg-amber-50 border-2 border-amber-400 rounded-2xl p-4 sm:p-5 shadow-sm">
+      <div class="flex items-start gap-3">
+        <div class="w-10 h-10 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center shrink-0 mt-0.5">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+            <line x1="12" y1="9" x2="12" y2="13"></line>
+            <line x1="12" y1="17" x2="12.01" y2="17"></line>
+          </svg>
+        </div>
+        <div>
+          <h2 class="text-sm sm:text-base font-extrabold text-amber-950">
+            Configuração Pendente Antes da Publicação
+          </h2>
+          <p class="text-xs sm:text-sm text-amber-900 mt-1 leading-relaxed">
+            As constantes <code class="font-mono bg-amber-100 px-1.5 py-0.5 rounded font-bold">SUPABASE_URL</code> e <code class="font-mono bg-amber-100 px-1.5 py-0.5 rounded font-bold">SUPABASE_ANON_KEY</code> no início do bloco <code class="font-mono bg-amber-100 px-1 rounded">&lt;script&gt;</code> deste arquivo ainda estão com valores de exemplo. Edite o arquivo <code class="font-mono font-bold">portal-importacao-coligadas.html</code> informando a URL e a chave pública (<strong>anon key</strong>) do seu projeto Supabase antes de disponibilizá-lo às coligadas.
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- =====================================================================
+         SEÇÃO 1: TELA DE LOGIN + AVISO DE PRIVACIDADE E AUDITORIA (LGPD)
+         ===================================================================== -->
+    <section id="loginSection" class="max-w-xl mx-auto my-2 sm:my-6 space-y-5">
+
+      <!-- Cartão de Autenticação -->
+      <div class="bg-white rounded-2xl border border-slate-200 shadow-lg overflow-hidden">
+        <div class="bg-[#0f172a] px-6 py-6 text-white">
+          <div class="flex items-center justify-between gap-2 mb-3">
+            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-[#2563eb]/30 text-blue-200 border border-blue-400/30">
+              Acesso Restrito • Coligadas
+            </span>
+            <span class="inline-flex items-center gap-1 text-[11px] font-semibold text-teal-300">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+              </svg>
+              Conexão Criptografada
+            </span>
+          </div>
+          <h2 class="text-xl font-extrabold tracking-tight">Autenticação de Operador</h2>
+          <p class="text-xs text-slate-300 mt-1 leading-relaxed">
+            Informe seu e-mail corporativo e senha cadastrados para acessar o portal de envio de planilhas ao repositório central.
+          </p>
+        </div>
+
+        <form id="loginForm" class="p-6 space-y-4" novalidate>
+          <!-- Alerta de Erro de Login -->
+          <div id="loginErrorBox" class="hidden rounded-xl bg-red-50 border border-red-200 p-3.5 text-xs text-red-800 flex items-start gap-2.5">
+            <svg class="w-4 h-4 text-red-600 shrink-0 mt-0.5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+              <circle cx="12" cy="12" r="10"></circle>
+              <line x1="12" y1="8" x2="12" y2="12"></line>
+              <line x1="12" y1="16" x2="12.01" y2="16"></line>
+            </svg>
+            <span id="loginErrorText">Credenciais inválidas.</span>
+          </div>
+
+          <div>
+            <label for="loginEmail" class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+              E-mail Corporativo
+            </label>
+            <input
+              type="email"
+              id="loginEmail"
+              required
+              autocomplete="email"
+              placeholder="operador@coligada.com.br"
+              class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#2563eb] focus:border-[#2563eb] transition"
+            />
+          </div>
+
+          <div>
+            <label for="loginPassword" class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+              Senha de Acesso
+            </label>
+            <input
+              type="password"
+              id="loginPassword"
+              required
+              autocomplete="current-password"
+              placeholder="••••••••••••"
+              class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#2563eb] focus:border-[#2563eb] transition"
+            />
+          </div>
+
+          <button
+            type="submit"
+            id="loginSubmitBtn"
+            class="w-full py-3 px-4 rounded-xl bg-[#2563eb] hover:bg-[#1d4ed8] text-white font-bold text-sm shadow-md transition flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
+          >
+            <span id="loginBtnSpinner" class="hidden w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin-fast"></span>
+            <span id="loginBtnText">Entrar no Portal</span>
+          </button>
+        </form>
+      </div>
+
+      <!-- Bloco Estruturado: Aviso de Privacidade, Segurança e Auditoria (LGPD) -->
+      <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 sm:p-6">
+        <div class="flex items-start gap-3 pb-3.5 border-b border-slate-100">
+          <div class="w-9 h-9 rounded-xl bg-teal-50 text-[#0d9488] border border-teal-200 flex items-center justify-center shrink-0">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+              <polyline points="9 12 11 14 15 10"></polyline>
+            </svg>
+          </div>
+          <div>
+            <h3 class="text-sm font-extrabold text-[#0f172a]">
+              Aviso de Privacidade, Segurança e Auditoria (LGPD — Lei nº 13.709/2018)
+            </h3>
+            <p class="text-[11px] font-semibold text-slate-500 mt-0.5">
+              Governança de Acesso, Rastreabilidade e Proteção de Dados Corporativos
+            </p>
+          </div>
+        </div>
+
+        <ul class="mt-3.5 space-y-2.5 text-xs text-slate-600 leading-relaxed">
+          <li class="flex items-start gap-2.5">
+            <span class="w-5 h-5 rounded-full bg-blue-50 text-[#2563eb] font-extrabold text-[11px] flex items-center justify-center shrink-0 mt-0.5">a</span>
+            <span>
+              <strong class="text-slate-800">Acesso Restrito Autorizado:</strong> Este ambiente destina-se exclusivamente a operadores previamente credenciados das empresas coligadas para o envio padronizado de dados operacionais ao repositório central.
+            </span>
+          </li>
+          <li class="flex items-start gap-2.5">
+            <span class="w-5 h-5 rounded-full bg-teal-50 text-[#0d9488] font-extrabold text-[11px] flex items-center justify-center shrink-0 mt-0.5">b</span>
+            <span>
+              <strong class="text-slate-800">Rastreabilidade Obrigatória:</strong> Para fins de segurança da informação, integridade dos dados e auditoria (Art. 6º e Art. 46 da LGPD), todas as operações de autenticação e importação registram automaticamente o identificador único do usuário (<code class="font-mono text-slate-800">UUID</code>), e-mail corporativo, nome do arquivo importado e data/hora (<code class="font-mono text-slate-800">timestamp</code>).
+            </span>
+          </li>
+          <li class="flex items-start gap-2.5">
+            <span class="w-5 h-5 rounded-full bg-slate-100 text-slate-700 font-extrabold text-[11px] flex items-center justify-center shrink-0 mt-0.5">c</span>
+            <span>
+              <strong class="text-slate-800">Minimização e Transmissão Segura:</strong> Não inclua dados pessoais sensíveis ou desnecessários (como CPF, telefone ou dados bancários de pessoas físicas) nas planilhas enviadas. Os registros são transmitidos via conexão criptografada (<code class="font-mono text-slate-800">HTTPS/TLS</code>) diretamente ao banco de dados gerenciado, sem retenção de arquivos no servidor web.
+            </span>
+          </li>
+        </ul>
+      </div>
+
+    </section>
+
+    <!-- =====================================================================
+         SEÇÃO 2: ÁREA AUTENTICADA DO PORTAL DE IMPORTAÇÃO (5 PASSOS)
+         ===================================================================== -->
+    <section id="portalDashboardSection" class="hidden space-y-6">
+
+      <!-- PASSO 1: UPLOAD E PLANILHA MODELO -->
+      <div class="bg-white rounded-2xl border border-slate-200 p-5 sm:p-6 shadow-sm">
+        <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-4 border-b border-slate-100">
+          <div>
+            <div class="flex items-center gap-2 flex-wrap">
+              <span class="w-6 h-6 rounded-full bg-[#2563eb] text-white text-xs font-extrabold inline-flex items-center justify-center">1</span>
+              <h2 class="text-sm sm:text-base font-extrabold text-[#0f172a] uppercase tracking-wider">
+                Upload e Planilha Modelo
+              </h2>
+              <span class="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-slate-100 text-slate-700 font-mono">
+                Destino: <span id="targetTableBadge">importacao_coligadas</span>
+              </span>
+            </div>
+            <p class="text-xs text-slate-500 mt-1">
+              Selecione ou arraste a planilha da sua coligada (.xlsx, .xls ou .csv). Caso precise de referência, baixe o modelo padronizado.
+            </p>
+          </div>
+
+          <div class="flex items-center gap-2.5 flex-wrap shrink-0">
+            <button
+              type="button"
+              id="downloadTemplateBtn"
+              class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#0f172a] hover:bg-slate-800 text-white text-xs font-bold shadow-sm transition"
+            >
+              <svg class="w-4 h-4 text-teal-400" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="7 10 12 15 17 10"></polyline>
+                <line x1="12" y1="15" x2="12" y2="3"></line>
+              </svg>
+              <span>Baixar Planilha Modelo (.xlsx)</span>
+            </button>
+
+            <button
+              type="button"
+              id="resetFileBtn"
+              class="hidden inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-bold transition"
+            >
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.4" viewBox="0 0 24 24">
+                <polyline points="3 6 5 6 21 6"></polyline>
+                <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path>
+              </svg>
+              <span>Trocar Arquivo</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Área de Drag & Drop -->
+        <div
+          id="dropZone"
+          class="mt-4 border-2 border-dashed border-slate-300 hover:border-[#2563eb] bg-slate-50/80 rounded-2xl p-6 sm:p-9 text-center cursor-pointer transition-all duration-150"
+        >
+          <input
+            type="file"
+            id="fileInput"
+            accept=".xlsx,.xls,.csv"
+            class="hidden"
+          />
+
+          <div class="w-12 h-12 rounded-2xl bg-blue-50 text-[#2563eb] border border-blue-100 flex items-center justify-center mx-auto mb-3">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+              <polyline points="14 2 14 8 20 8"></polyline>
+              <line x1="12" y1="18" x2="12" y2="12"></line>
+              <polyline points="9 15 12 12 15 15"></polyline>
+            </svg>
+          </div>
+
+          <p class="text-sm sm:text-base font-bold text-[#0f172a]">
+            Arraste e solte sua planilha aqui ou <span class="text-[#2563eb] underline">clique para selecionar</span>
+          </p>
+          <p class="text-xs text-slate-500 mt-1">
+            Formatos suportados: <strong>.xlsx</strong>, <strong>.xls</strong> e <strong>.csv</strong>
+          </p>
+
+          <!-- Informações do Arquivo Selecionado (Nome + Tamanho) -->
+          <div id="selectedFileBadge" class="hidden mt-4 inline-flex items-center gap-2.5 px-4 py-2 rounded-xl bg-teal-50 border border-teal-200 text-xs font-bold text-teal-900">
+            <svg class="w-4 h-4 text-[#0d9488] shrink-0" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+              <polyline points="20 6 9 17 4 12"></polyline>
+            </svg>
+            <span id="selectedFileNameDisplay">planilha.xlsx</span>
+            <span id="selectedFileSizeDisplay" class="px-2 py-0.5 rounded bg-white text-teal-700 border border-teal-200 font-mono text-[11px]">0 KB</span>
+          </div>
+        </div>
+
+        <!-- Seletor de Aba (Exibido quando o arquivo Excel possui múltiplas abas) -->
+        <div id="sheetSelectorContainer" class="hidden mt-4 p-3.5 rounded-xl bg-blue-50/80 border border-blue-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div class="flex items-center gap-2 text-xs text-blue-950">
+            <svg class="w-4 h-4 text-[#2563eb] shrink-0" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+              <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+              <line x1="3" y1="9" x2="21" y2="9"></line>
+              <line x1="9" y1="21" x2="9" y2="9"></line>
+            </svg>
+            <span><strong>Múltiplas abas detectadas:</strong> escolha qual aba da pasta de trabalho deseja importar:</span>
+          </div>
+          <select
+            id="sheetSelector"
+            class="px-3 py-2 rounded-lg border border-blue-300 bg-white text-xs font-bold text-[#0f172a] focus:outline-none focus:ring-2 focus:ring-[#2563eb] sm:min-w-[220px]"
+          ></select>
+        </div>
+
+        <!-- Alerta de Erro de Leitura do Arquivo -->
+        <div id="fileParseErrorBox" class="hidden mt-4 rounded-xl bg-red-50 border border-red-200 p-3.5 text-xs text-red-800"></div>
+      </div>
+
+      <!-- WORKSPACE DE STAGING (PASSOS 2, 3 E 4 — VISÍVEL APÓS CARREGAR ARQUIVO) -->
+      <div id="stagingWorkspace" class="hidden space-y-6">
+
+        <!-- PASSO 2: MAPEAMENTO INTELIGENTE DE COLUNAS -->
+        <div class="bg-white rounded-2xl border border-slate-200 p-5 sm:p-6 shadow-sm">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-4 border-b border-slate-100">
+            <div>
+              <h3 class="text-sm sm:text-base font-extrabold text-[#0f172a] uppercase tracking-wider flex items-center gap-2">
+                <span class="w-6 h-6 rounded-full bg-[#2563eb] text-white text-xs font-extrabold inline-flex items-center justify-center">2</span>
+                <span>Mapeamento Inteligente de Colunas</span>
+              </h3>
+              <p class="text-xs text-slate-500 mt-1">
+                O sistema identificou automaticamente os cabeçalhos equivalentes. Revise ou ajuste o pareamento entre sua planilha e as colunas da tabela existente.
+              </p>
+            </div>
+            <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-slate-100 text-slate-700">
+              Colunas na planilha: <strong id="detectedColsCount">0</strong>
+            </span>
+          </div>
+
+          <div id="columnMappingGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 mt-4">
+            <!-- Cards de mapeamento gerados dinamicamente -->
+          </div>
+        </div>
+
+        <!-- PASSO 3: NORMALIZAÇÃO, VALIDAÇÃO E PRÉ-VISUALIZAÇÃO -->
+        <div class="space-y-4">
+          <!-- 3 Cards de Métricas -->
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div class="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 shadow-sm flex items-center justify-between">
+              <div>
+                <p class="text-[11px] font-bold uppercase tracking-wider text-slate-400">Total de Linhas Lidas</p>
+                <p id="metricTotalRows" class="text-2xl font-extrabold text-[#0f172a] mt-1">0</p>
+                <p id="metricActiveSheetName" class="text-xs text-slate-500 mt-0.5">Aba: -</p>
+              </div>
+              <div class="w-11 h-11 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+                  <line x1="8" y1="6" x2="21" y2="6"></line>
+                  <line x1="8" y1="12" x2="21" y2="12"></line>
+                  <line x1="8" y1="18" x2="21" y2="18"></line>
+                  <line x1="3" y1="6" x2="3.01" y2="6"></line>
+                  <line x1="3" y1="12" x2="3.01" y2="12"></line>
+                  <line x1="3" y1="18" x2="3.01" y2="18"></line>
+                </svg>
+              </div>
+            </div>
+
+            <div class="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 shadow-sm flex items-center justify-between">
+              <div>
+                <p class="text-[11px] font-bold uppercase tracking-wider text-slate-400">Linhas Válidas</p>
+                <p id="metricValidRows" class="text-2xl font-extrabold text-[#0d9488] mt-1">0</p>
+                <p id="metricValidTotals" class="text-xs text-slate-500 mt-0.5">Qtd: 0 • Valor: R$ 0,00</p>
+              </div>
+              <div class="w-11 h-11 rounded-xl bg-teal-50 text-[#0d9488] flex items-center justify-center">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.4" viewBox="0 0 24 24">
+                  <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
+              </div>
+            </div>
+
+            <div class="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 shadow-sm flex items-center justify-between">
+              <div>
+                <p class="text-[11px] font-bold uppercase tracking-wider text-slate-400">Inconsistências Detectadas</p>
+                <p id="metricInvalidRows" class="text-2xl font-extrabold text-rose-600 mt-1">0</p>
+                <p class="text-xs text-slate-500 mt-0.5">Linhas ignoradas no envio</p>
+              </div>
+              <div class="w-11 h-11 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+                  <circle cx="12" cy="12" r="10"></circle>
+                  <line x1="12" y1="8" x2="12" y2="12"></line>
+                  <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                </svg>
+              </div>
+            </div>
+          </div>
+
+          <!-- Tabela de Pré-Visualização das 10 Primeiras Linhas Normalizadas -->
+          <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+            <div class="p-5 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div>
+                <h3 class="text-sm sm:text-base font-extrabold text-[#0f172a] uppercase tracking-wider flex items-center gap-2">
+                  <span class="w-6 h-6 rounded-full bg-[#2563eb] text-white text-xs font-extrabold inline-flex items-center justify-center">3</span>
+                  <span>Normalização, Validação e Pré-Visualização (10 Primeiras Linhas)</span>
+                </h3>
+                <p class="text-xs text-slate-500 mt-1">
+                  Datas e valores monetários são padronizados automaticamente. Linhas inválidas são destacadas em vermelho com o motivo.
+                </p>
+              </div>
+              <span id="previewWarningBadge" class="hidden px-3 py-1.5 rounded-xl bg-rose-50 border border-rose-200 text-xs font-bold text-rose-700">
+                Existem linhas com inconsistência
+              </span>
+            </div>
+
+            <div class="overflow-x-auto table-scroll">
+              <table class="w-full text-left border-collapse">
+                <thead>
+                  <tr class="bg-slate-50 border-b border-slate-200 text-[11px] font-extrabold uppercase tracking-wider text-slate-600">
+                    <th class="py-3 px-3">Linha</th>
+                    <th class="py-3 px-3">Validação</th>
+                    <th class="py-3 px-3">data_referencia</th>
+                    <th class="py-3 px-3">codigo_coligada</th>
+                    <th class="py-3 px-3">codigo_loja</th>
+                    <th class="py-3 px-3">codigo_sku</th>
+                    <th class="py-3 px-3">categoria</th>
+                    <th class="py-3 px-3 text-right">quantidade</th>
+                    <th class="py-3 px-3 text-right">valor_total</th>
+                    <th class="py-3 px-3">inserido_por_email</th>
+                  </tr>
+                </thead>
+                <tbody id="previewTableBody" class="divide-y divide-slate-100 text-xs">
+                  <!-- Preenchido dinamicamente -->
+                </tbody>
+              </table>
+            </div>
+
+            <!-- PASSO 4: ENVIO EM LOTES (BATCH INSERT) COM RASTREABILIDADE -->
+            <div class="p-5 bg-slate-50 border-t border-slate-200 space-y-4">
+              <div class="flex items-center gap-2">
+                <span class="w-6 h-6 rounded-full bg-[#0d9488] text-white text-xs font-extrabold inline-flex items-center justify-center">4</span>
+                <h4 class="text-xs sm:text-sm font-extrabold text-[#0f172a] uppercase tracking-wider">
+                  Envio em Lotes (Batch Insert) com Rastreabilidade
+                </h4>
+              </div>
+
+              <!-- Barra de Progresso em Tempo Real -->
+              <div id="uploadProgressWrapper" class="hidden space-y-1.5 bg-white p-3.5 rounded-xl border border-slate-200">
+                <div class="flex items-center justify-between text-xs font-bold">
+                  <span id="uploadProgressLabel" class="text-[#0f172a]">Preparando envio em lotes...</span>
+                  <span id="uploadProgressPct" class="text-[#0d9488]">0%</span>
+                </div>
+                <div class="w-full h-3 bg-slate-200 rounded-full overflow-hidden">
+                  <div id="uploadProgressBar" class="h-full bg-gradient-to-r from-[#2563eb] to-[#0d9488] rounded-full transition-all duration-200" style="width: 0%"></div>
+                </div>
+              </div>
+
+              <!-- Banner de Resultado Final da Carga -->
+              <div id="uploadResultBanner" class="hidden rounded-xl p-4 text-xs leading-relaxed"></div>
+
+              <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <p class="text-xs text-slate-600 leading-relaxed">
+                  Os registros válidos serão enviados em lotes de até <strong>500 linhas</strong> com gravação automática de <code class="font-mono bg-white px-1.5 py-0.5 rounded border border-slate-200">nome_arquivo</code>, <code class="font-mono bg-white px-1.5 py-0.5 rounded border border-slate-200">inserido_por_id</code> e <code class="font-mono bg-white px-1.5 py-0.5 rounded border border-slate-200">inserido_por_email</code>.
+                </p>
+
+                <button
+                  type="button"
+                  id="confirmImportBtn"
+                  class="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-[#0d9488] hover:bg-[#0f766e] text-white font-extrabold text-sm shadow-md transition disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
+                >
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.4" viewBox="0 0 24 24">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                    <polyline points="17 8 12 3 7 8"></polyline>
+                    <line x1="12" y1="3" x2="12" y2="15"></line>
+                  </svg>
+                  <span id="confirmImportBtnText">Importar Registros Válidos</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===================================================================
+           PASSO 5: HISTÓRICO RECENTE AUDITADO (ÚLTIMOS 15 REGISTROS DO OPERADOR)
+           =================================================================== -->
+      <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+        <div class="p-5 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <div class="flex items-center gap-2 flex-wrap">
+              <span class="w-6 h-6 rounded-full bg-[#0f172a] text-white text-xs font-extrabold inline-flex items-center justify-center">5</span>
+              <h3 class="text-sm sm:text-base font-extrabold text-[#0f172a] uppercase tracking-wider">
+                Histórico Recente Auditado
+              </h3>
+              <span class="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-blue-50 text-[#2563eb] border border-blue-100">
+                Últimos 15 registros do seu usuário
+              </span>
+            </div>
+            <p class="text-xs text-slate-500 mt-1">
+              Consulta direta aos registros gravados pelo seu login com proteção Row Level Security (RLS).
+            </p>
+          </div>
+
+          <button
+            type="button"
+            id="refreshHistoryBtn"
+            class="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-[#0f172a] text-xs font-bold border border-slate-200 transition self-start sm:self-auto"
+          >
+            <svg id="refreshHistoryIcon" class="w-4 h-4 text-[#2563eb]" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+              <polyline points="23 4 23 10 17 10"></polyline>
+              <polyline points="1 20 1 14 7 14"></polyline>
+              <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+            </svg>
+            <span>Atualizar Histórico</span>
+          </button>
+        </div>
+
+        <!-- Aviso caso ocorra erro na consulta do histórico -->
+        <div id="historyFeedbackBox" class="hidden m-4 rounded-xl p-3.5 text-xs"></div>
+
+        <div class="overflow-x-auto table-scroll">
+          <table class="w-full text-left border-collapse">
+            <thead>
+              <tr class="bg-slate-50 border-b border-slate-200 text-[11px] font-extrabold uppercase tracking-wider text-slate-600">
+                <th class="py-3 px-3.5">Data/Hora da Carga</th>
+                <th class="py-3 px-3.5">Arquivo</th>
+                <th class="py-3 px-3.5">Data Ref.</th>
+                <th class="py-3 px-3.5">Coligada</th>
+                <th class="py-3 px-3.5">Loja</th>
+                <th class="py-3 px-3.5">SKU</th>
+                <th class="py-3 px-3.5 text-right">Quantidade</th>
+                <th class="py-3 px-3.5 text-right">Valor Total</th>
+                <th class="py-3 px-3.5">Operador (Login)</th>
+              </tr>
+            </thead>
+            <tbody id="historyTableBody" class="divide-y divide-slate-100 text-xs">
+              <tr>
+                <td colspan="9" class="py-8 px-4 text-center text-slate-400">
+                  Aguardando autenticação para carregar o histórico...
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </section>
+  </main>
+
+  <!-- =======================================================================
+       RODAPÉ DISCRETO DE CONFORMIDADE LGPD E RASTREABILIDADE
+       ======================================================================= -->
+  <footer class="bg-white border-t border-slate-200 mt-10">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-slate-500">
+      <span>
+        <strong>Portal de Importação de Dados — Coligadas</strong> • Transmissão criptografada (HTTPS/TLS) diretamente ao banco gerenciado.
+      </span>
+      <span class="text-slate-600 font-medium">
+        Conformidade LGPD (Lei nº 13.709/2018) • Rastreabilidade ativa por <code class="font-mono text-slate-800">UUID</code> e e-mail corporativo.
+      </span>
+    </div>
+  </footer>
+
+  <!-- Notificação Flutuante Discreta (Substitui alert()) -->
+  <div id="toastNotification" class="hidden fixed bottom-5 right-5 z-50 max-w-sm bg-[#0f172a] text-white border border-slate-700 px-4 py-3 rounded-xl shadow-xl text-xs font-semibold flex items-center gap-2.5">
+    <span class="w-2 h-2 rounded-full bg-teal-400 shrink-0"></span>
+    <span id="toastNotificationText">Mensagem</span>
+  </div>
+
+  <!-- =======================================================================
+       LÓGICA DE PRODUÇÃO (SUPABASE AUTH, SHEETJS, NORMALIZAÇÃO & BATCH INSERT)
+       ======================================================================= -->
+  <script>
+    (function () {
+      "use strict";
+
+      // =======================================================================
+      // CONFIGURAÇÃO DE PRODUÇÃO DO SUPABASE
+      // -----------------------------------------------------------------------
+      // 1. Utilize EXCLUSIVAMENTE a chave pública (anon key) do projeto.
+      //    NUNCA exponha a chave administrativa (service_role key) no frontend.
+      // 2. A tabela de destino (TARGET_TABLE) já deve existir previamente no
+      //    PostgreSQL do Supabase com Row Level Security (RLS) ativado.
+      // 3. Este portal executa estritamente operações de INSERT e SELECT,
+      //    nunca criando ou alterando estruturas de tabelas no banco.
+      // =======================================================================
+      const SUPABASE_URL = https://slqjcspelktcdpacznpe.supabase.co/rest/v1/;
+      const SUPABASE_ANON_KEY = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNscWpjc3BlbGt0Y2RwYWN6bnBlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTUwMjA0MzEsImV4cCI6MjExMDU5NjQzMX0.j3h7m2ZPhKNvK5K9C8IQDvMFf40AAn7-bDt362p0W-k;
+      const TARGET_TABLE = 'importacao_coligadas';
+
+      // Estado da Sessão e da Planilha
+      let supabaseClient = null;
+      let currentUser = null;
+      let activeWorkbook = null;
+      let activeSheetName = '';
+      let rawSheetRows = [];
+      let detectedHeaders = [];
+      let currentFileName = '';
+      let columnMapping = {};
+      let processedRows = [];
+
+      // Definição do Esquema de Colunas da Tabela Existente (importacao_coligadas)
+      const SCHEMA_FIELDS = [
+        {
+          key: 'data_referencia',
+          label: 'data_referencia',
+          type: 'date',
+          required: true,
+          hint: 'Obrigatório • Data (YYYY-MM-DD ou DD/MM/AAAA)',
+          aliases: ['data_referencia', 'data', 'dt_ref', 'dt_referencia', 'competencia', 'data_venda', 'data_movimento', 'dt']
+        },
+        {
+          key: 'codigo_coligada',
+          label: 'codigo_coligada',
+          type: 'string',
+          required: false,
+          hint: 'Opcional • Texto (Código da Coligada/Empresa)',
+          aliases: ['codigo_coligada', 'coligada', 'empresa', 'cod_coligada', 'grupo', 'cnpj_coligada']
+        },
+        {
+          key: 'codigo_loja',
+          label: 'codigo_loja',
+          type: 'string',
+          required: true,
+          hint: 'Obrigatório • Texto (Código da Loja/Filial/PDV)',
+          aliases: ['codigo_loja', 'loja', 'filial', 'pdv', 'cod_loja', 'id_loja', 'codigo_pdv', 'unidade']
+        },
+        {
+          key: 'codigo_sku',
+          label: 'codigo_sku',
+          type: 'string',
+          required: true,
+          hint: 'Obrigatório • Texto (Código do SKU/Produto/Item)',
+          aliases: ['codigo_sku', 'sku', 'produto', 'item', 'cod_sku', 'codigo_produto', 'cod_produto', 'ean']
+        },
+        {
+          key: 'categoria',
+          label: 'categoria',
+          type: 'string',
+          required: false,
+          hint: 'Opcional • Texto (Categoria/Departamento)',
+          aliases: ['categoria', 'departamento', 'linha', 'familia', 'segmento', 'secao']
+        },
+        {
+          key: 'quantidade',
+          label: 'quantidade',
+          type: 'number',
+          required: false,
+          defaultVal: 0,
+          hint: 'Opcional • Numérico (Padrão: 0)',
+          aliases: ['quantidade', 'qtd', 'qtde', 'volume', 'unidades', 'pecas', 'saldo']
+        },
+        {
+          key: 'valor_total',
+          label: 'valor_total',
+          type: 'currency',
+          required: false,
+          defaultVal: 0,
+          hint: 'Opcional • Numérico (Padrão: 0)',
+          aliases: ['valor_total', 'valor', 'faturamento', 'total', 'vlr_total', 'receita', 'montante', 'preco_total']
+        }
+      ];
+
+      // =======================================================================
+      // UTILITÁRIOS DE FORMATAÇÃO E NOTIFICAÇÃO
+      // =======================================================================
+      let toastTimer = null;
+      function showToast(message) {
+        const toast = document.getElementById('toastNotification');
+        const text = document.getElementById('toastNotificationText');
+        if (!toast || !text) return;
+        text.textContent = message;
+        toast.classList.remove('hidden');
+        if (toastTimer) clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => {
+          toast.classList.add('hidden');
+        }, 3600);
+      }
+
+      function escapeHtml(str) {
+        if (str === null || str === undefined) return '';
+        return String(str)
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#39;');
+      }
+
+      function formatFileSize(bytes) {
+        if (!bytes || isNaN(bytes)) return '0 KB';
+        if (bytes < 1024) return bytes + ' B';
+        if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1).replace('.', ',') + ' KB';
+        return (bytes / (1024 * 1024)).toFixed(2).replace('.', ',') + ' MB';
+      }
+
+      function formatCurrencyBRL(num) {
+        const val = Number(num) || 0;
+        return val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+      }
+
+      function formatNumberBR(num) {
+        const val = Number(num) || 0;
+        return val.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+      }
+
+      function formatDateTimeBR(isoString) {
+        if (!isoString) return '-';
+        try {
+          const d = new Date(isoString);
+          if (isNaN(d.getTime())) return String(isoString);
+          return d.toLocaleString('pt-BR', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+          });
+        } catch (e) {
+          return String(isoString);
+        }
+      }
+
+      function formatDateOnlyBR(yyyyMmDd) {
+        if (!yyyyMmDd || typeof yyyyMmDd !== 'string') return '-';
+        const clean = yyyyMmDd.split('T')[0];
+        const parts = clean.split('-');
+        if (parts.length === 3) {
+          return `${parts[2]}/${parts[1]}/${parts[0]}`;
+        }
+        return yyyyMmDd;
+      }
+
+      // =======================================================================
+      // VALIDAÇÃO DE CONFIGURAÇÃO E INICIALIZAÇÃO DO SUPABASE
+      // =======================================================================
+      function isProductionConfigured() {
+        const url = (SUPABASE_URL || '').trim();
+        const key = (SUPABASE_ANON_KEY || '').trim();
+        if (!url || url === 'https://SEU-PROJETO.supabase.co' || !url.startsWith('https://')) {
+          return false;
+        }
+        if (!key || key === 'SUA_SUPABASE_ANON_KEY_PUBLICA' || key.length < 20) {
+          return false;
+        }
+        return true;
+      }
+
+      async function initSupabase() {
+        const targetBadge = document.getElementById('targetTableBadge');
+        if (targetBadge) targetBadge.textContent = TARGET_TABLE;
+
+        const placeholderAlert = document.getElementById('placeholderConfigAlert');
+
+        if (!isProductionConfigured()) {
+          if (placeholderAlert) placeholderAlert.classList.remove('hidden');
+          supabaseClient = null;
+          setUnauthenticatedView();
+          return;
+        }
+
+        if (placeholderAlert) placeholderAlert.classList.add('hidden');
+
+        try {
+          if (!window.supabase || !window.supabase.createClient) {
+            throw new Error('SDK do Supabase não carregado. Verifique sua conexão de rede.');
+          }
+
+          supabaseClient = window.supabase.createClient(SUPABASE_URL.trim(), SUPABASE_ANON_KEY.trim());
+
+          // Recupera sessão ativa se já existir
+          const { data, error } = await supabaseClient.auth.getSession();
+          if (error) {
+            setUnauthenticatedView();
+          } else if (data && data.session && data.session.user) {
+            setAuthenticatedView(data.session.user);
+          } else {
+            setUnauthenticatedView();
+          }
+
+          // Monitora mudanças de autenticação (login, logout, renovação de token)
+          supabaseClient.auth.onAuthStateChange((event, session) => {
+            if (session && session.user) {
+              setAuthenticatedView(session.user);
+            } else {
+              setUnauthenticatedView();
+            }
+          });
+        } catch (err) {
+          supabaseClient = null;
+          showLoginError('Falha ao inicializar comunicação com o banco: ' + err.message);
+        }
+      }
+
+      // =======================================================================
+      // CONTROLE DE SESSÃO (LOGIN / LOGOUT)
+      // =======================================================================
+      function setAuthenticatedView(user) {
+        const isNewUserLogin = !currentUser || currentUser.id !== user.id;
+        currentUser = user;
+
+        document.getElementById('loginSection').classList.add('hidden');
+        document.getElementById('portalDashboardSection').classList.remove('hidden');
+
+        const userBadge = document.getElementById('userBadgeContainer');
+        userBadge.classList.remove('hidden');
+        userBadge.classList.add('flex');
+
+        const logoutBtn = document.getElementById('logoutBtn');
+        logoutBtn.classList.remove('hidden');
+        logoutBtn.classList.add('inline-flex');
+
+        const email = user.email || 'operador@coligada';
+        const shortUuid = user.id ? user.id.slice(0, 8) + '...' : '--------';
+        const initials = email.slice(0, 2).toUpperCase();
+
+        document.getElementById('loggedUserEmail').textContent = email;
+        const uuidEl = document.getElementById('loggedUserUuid');
+        uuidEl.textContent = 'UUID: ' + shortUuid;
+        uuidEl.title = 'UUID completo: ' + (user.id || '');
+        document.getElementById('userAvatarInitials').textContent = initials;
+
+        if (rawSheetRows.length > 0) {
+          recomputeMappedData();
+        }
+
+        if (isNewUserLogin) {
+          loadAuditHistory();
+        }
+      }
+
+      function setUnauthenticatedView() {
+        currentUser = null;
+        document.getElementById('loginSection').classList.remove('hidden');
+        document.getElementById('portalDashboardSection').classList.add('hidden');
+
+        const userBadge = document.getElementById('userBadgeContainer');
+        userBadge.classList.add('hidden');
+        userBadge.classList.remove('flex');
+
+        const logoutBtn = document.getElementById('logoutBtn');
+        logoutBtn.classList.add('hidden');
+        logoutBtn.classList.remove('inline-flex');
+      }
+
+      function translateAuthError(message) {
+        const msg = (message || '').toLowerCase();
+        if (msg.includes('invalid login credentials')) {
+          return 'E-mail ou senha inválidos. Verifique suas credenciais e tente novamente.';
+        }
+        if (msg.includes('email not confirmed')) {
+          return 'E-mail ainda não confirmado. Verifique sua caixa de entrada.';
+        }
+        if (msg.includes('too many requests')) {
+          return 'Muitas tentativas consecutivas. Aguarde alguns instantes antes de tentar novamente.';
+        }
+        if (msg.includes('failed to fetch') || msg.includes('network')) {
+          return 'Erro de conexão com o servidor. Verifique sua internet e tente novamente.';
+        }
+        return message || 'Não foi possível autenticar o operador.';
+      }
+
+      function showLoginError(msg) {
+        const box = document.getElementById('loginErrorBox');
+        const txt = document.getElementById('loginErrorText');
+        txt.textContent = msg;
+        box.classList.remove('hidden');
+      }
+
+      function clearLoginError() {
+        document.getElementById('loginErrorBox').classList.add('hidden');
+      }
+
+      // =======================================================================
+      // PASSO 1: PLANILHA MODELO (.XLSX) & LEITURA DO ARQUIVO (EXCEL / CSV)
+      // =======================================================================
+      function downloadSampleTemplate() {
+        try {
+          if (typeof XLSX === 'undefined') {
+            showToast('Biblioteca SheetJS não disponível no momento.');
+            return;
+          }
+
+          // Dados 100% fictícios sem qualquer dado pessoal real
+          const sampleRows = [
+            {
+              data_referencia: '2026-11-18',
+              codigo_coligada: 'COL-01',
+              codigo_loja: 'LOJA-101',
+              codigo_sku: 'SKU-5001',
+              categoria: 'Mercearia',
+              quantidade: 150,
+              valor_total: 2340.50
+            },
+            {
+              data_referencia: '2026-11-18',
+              codigo_coligada: 'COL-01',
+              codigo_loja: 'LOJA-102',
+              codigo_sku: 'SKU-5002',
+              categoria: 'Bebidas',
+              quantidade: 80,
+              valor_total: 1120.00
+            },
+            {
+              data_referencia: '2026-11-18',
+              codigo_coligada: 'COL-02',
+              codigo_loja: 'LOJA-205',
+              codigo_sku: 'SKU-7890',
+              categoria: 'Higiene e Limpeza',
+              quantidade: 45,
+              valor_total: 689.90
+            }
+          ];
+
+          const ws = XLSX.utils.json_to_sheet(sampleRows);
+          ws['!cols'] = [
+            { wch: 18 },
+            { wch: 18 },
+            { wch: 16 },
+            { wch: 16 },
+            { wch: 22 },
+            { wch: 14 },
+            { wch: 16 }
+          ];
+
+          const wb = XLSX.utils.book_new();
+          XLSX.utils.book_append_sheet(wb, ws, 'Modelo_Coligada');
+          XLSX.writeFile(wb, 'modelo_importacao_coligadas.xlsx');
+
+          showToast('Planilha modelo (.xlsx) gerada e baixada!');
+        } catch (err) {
+          showToast('Erro ao gerar planilha modelo: ' + err.message);
+        }
+      }
+
+      function handleFileSelected(file) {
+        const errBox = document.getElementById('fileParseErrorBox');
+        errBox.classList.add('hidden');
+
+        if (!file) return;
+
+        if (!/\.(xlsx|xls|csv)$/i.test(file.name)) {
+          errBox.textContent = 'Formato inválido. Selecione um arquivo Excel (.xlsx, .xls) ou .csv.';
+          errBox.classList.remove('hidden');
+          return;
+        }
+
+        if (typeof XLSX === 'undefined') {
+          errBox.textContent = 'Biblioteca de leitura Excel (SheetJS) não carregada. Recarregue a página.';
+          errBox.classList.remove('hidden');
+          return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = function (evt) {
+          try {
+            const buffer = evt.target.result;
+            const workbook = XLSX.read(buffer, { type: 'array', cellDates: true });
+
+            if (!workbook.SheetNames || workbook.SheetNames.length === 0) {
+              throw new Error('O arquivo selecionado não contém nenhuma aba legível.');
+            }
+
+            activeWorkbook = workbook;
+            currentFileName = file.name;
+
+            // Exibe nome e tamanho do arquivo
+            document.getElementById('selectedFileNameDisplay').textContent = file.name;
+            document.getElementById('selectedFileSizeDisplay').textContent = formatFileSize(file.size);
+            document.getElementById('selectedFileBadge').classList.remove('hidden');
+            document.getElementById('resetFileBtn').classList.remove('hidden');
+
+            // Configura seletor de abas caso existam múltiplas abas
+            const sheetContainer = document.getElementById('sheetSelectorContainer');
+            const sheetSelector = document.getElementById('sheetSelector');
+            sheetSelector.innerHTML = '';
+
+            workbook.SheetNames.forEach((name) => {
+              const opt = document.createElement('option');
+              opt.value = name;
+              opt.textContent = name;
+              sheetSelector.appendChild(opt);
+            });
+
+            if (workbook.SheetNames.length > 1) {
+              sheetContainer.classList.remove('hidden');
+            } else {
+              sheetContainer.classList.add('hidden');
+            }
+
+            // Carrega a primeira aba por padrão
+            loadWorksheetByName(workbook.SheetNames[0]);
+            showToast(`Arquivo "${file.name}" carregado com sucesso.`);
+          } catch (err) {
+            errBox.textContent = 'Erro ao ler o arquivo: ' + err.message;
+            errBox.classList.remove('hidden');
+          }
+        };
+
+        reader.onerror = function () {
+          errBox.textContent = 'Não foi possível ler o arquivo selecionado no navegador.';
+          errBox.classList.remove('hidden');
+        };
+
+        reader.readAsArrayBuffer(file);
+      }
+
+      function loadWorksheetByName(sheetName) {
+        const errBox = document.getElementById('fileParseErrorBox');
+        errBox.classList.add('hidden');
+
+        try {
+          if (!activeWorkbook || !activeWorkbook.Sheets[sheetName]) {
+            throw new Error('Aba selecionada não encontrada no arquivo.');
+          }
+
+          activeSheetName = sheetName;
+          const worksheet = activeWorkbook.Sheets[sheetName];
+          const jsonRows = XLSX.utils.sheet_to_json(worksheet, { defval: '' });
+
+          if (!jsonRows || jsonRows.length === 0) {
+            throw new Error(`A aba "${sheetName}" está vazia. Preencha os dados ou escolha outra aba.`);
+          }
+
+          const headersSet = new Set();
+          jsonRows.forEach((row) => {
+            Object.keys(row).forEach((key) => {
+              if (!key.startsWith('__EMPTY')) {
+                headersSet.add(key);
+              }
+            });
+          });
+
+          const headersList = Array.from(headersSet);
+          if (headersList.length === 0) {
+            throw new Error(`Não foram encontrados cabeçalhos válidos na primeira linha da aba "${sheetName}".`);
+          }
+
+          rawSheetRows = jsonRows;
+          detectedHeaders = headersList;
+          columnMapping = autoPairColumns(detectedHeaders);
+
+          document.getElementById('stagingWorkspace').classList.remove('hidden');
+          document.getElementById('uploadResultBanner').classList.add('hidden');
+          document.getElementById('uploadProgressWrapper').classList.add('hidden');
+
+          renderColumnMappingControls();
+          recomputeMappedData();
+        } catch (err) {
+          document.getElementById('stagingWorkspace').classList.add('hidden');
+          errBox.textContent = err.message;
+          errBox.classList.remove('hidden');
+        }
+      }
+
+      // =======================================================================
+      // PASSO 2: MAPEAMENTO INTELIGENTE DE COLUNAS
+      // =======================================================================
+      function normalizeHeader(name) {
+        return String(name || '')
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '')
+          .toLowerCase()
+          .replace(/[^a-z0-9]/g, '_')
+          .replace(/_+/g, '_')
+          .replace(/^_|_$/g, '');
+      }
+
+      function autoPairColumns(excelHeaders) {
+        const normalizedList = excelHeaders.map((original) => ({
+          original,
+          norm: normalizeHeader(original)
+        }));
+
+        const mapping = {};
+
+        SCHEMA_FIELDS.forEach((field) => {
+          // 1. Correspondência exata com sinônimos
+          let found = normalizedList.find((item) => field.aliases.includes(item.norm));
+
+          // 2. Correspondência parcial com sinônimos
+          if (!found) {
+            found = normalizedList.find((item) =>
+              field.aliases.some((alias) => item.norm.includes(alias) || alias.includes(item.norm))
+            );
+          }
+
+          mapping[field.key] = found ? found.original : '';
+        });
+
+        return mapping;
+      }
+
+      function renderColumnMappingControls() {
+        const grid = document.getElementById('columnMappingGrid');
+        document.getElementById('detectedColsCount').textContent = detectedHeaders.length;
+        grid.innerHTML = '';
+
+        SCHEMA_FIELDS.forEach((field) => {
+          const card = document.createElement('div');
+          card.className = 'p-3.5 rounded-xl border border-slate-200 bg-slate-50/80 flex flex-col justify-between gap-2';
+
+          const isMapped = Boolean(columnMapping[field.key]);
+          const badgeHtml = field.required
+            ? '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-blue-800">Obrigatório</span>'
+            : '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-200 text-slate-700">Opcional</span>';
+
+          const statusDot = isMapped
+            ? '<span class="w-2 h-2 rounded-full bg-[#0d9488]" title="Coluna pareada"></span>'
+            : '<span class="w-2 h-2 rounded-full bg-amber-400" title="Sem coluna vinculada"></span>';
+
+          let optionsHtml = '<option value="">-- Não mapear / Padrão --</option>';
+          detectedHeaders.forEach((hdr) => {
+            const selected = columnMapping[field.key] === hdr ? 'selected' : '';
+            optionsHtml += `<option value="${escapeHtml(hdr)}" ${selected}>${escapeHtml(hdr)}</option>`;
+          });
+
+          card.innerHTML = `
+            <div>
+              <div class="flex items-center justify-between gap-1.5">
+                <div class="flex items-center gap-1.5 min-w-0">
+                  ${statusDot}
+                  <code class="text-xs font-extrabold text-[#0f172a] truncate">${field.label}</code>
+                </div>
+                ${badgeHtml}
+              </div>
+              <p class="text-[11px] text-slate-500 mt-1">${field.hint}</p>
+            </div>
+            <select
+              data-schema-key="${field.key}"
+              class="mapping-select w-full px-3 py-2 rounded-lg border border-slate-300 bg-white text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#2563eb]"
+            >
+              ${optionsHtml}
+            </select>
+          `;
+
+          grid.appendChild(card);
+        });
+
+        grid.querySelectorAll('.mapping-select').forEach((sel) => {
+          sel.addEventListener('change', function () {
+            const key = this.getAttribute('data-schema-key');
+            columnMapping[key] = this.value;
+            renderColumnMappingControls();
+            recomputeMappedData();
+          });
+        });
+      }
+
+      // =======================================================================
+      // PASSO 3: NORMALIZAÇÃO DE DATAS/VALORES E VALIDAÇÃO PRÉVIA
+      // =======================================================================
+      function isValidCalendarDate(year, month, day) {
+        if (year < 1990 || year > 2100 || month < 1 || month > 12 || day < 1 || day > 31) return false;
+        const d = new Date(Date.UTC(year, month - 1, day));
+        return d.getUTCFullYear() === year && d.getUTCMonth() === month - 1 && d.getUTCDate() === day;
+      }
+
+      function parseDateToISO(rawVal) {
+        if (rawVal === null || rawVal === undefined || rawVal === '') return null;
+
+        // 1. Objeto Date (SheetJS cellDates: true)
+        if (rawVal instanceof Date) {
+          if (isNaN(rawVal.getTime())) return null;
+          const adjusted = new Date(rawVal.getTime() + 12 * 3600 * 1000);
+          const y = adjusted.getUTCFullYear();
+          const m = String(adjusted.getUTCMonth() + 1).padStart(2, '0');
+          const d = String(adjusted.getUTCDate()).padStart(2, '0');
+          return isValidCalendarDate(y, Number(m), Number(d)) ? `${y}-${m}-${d}` : null;
+        }
+
+        // 2. Número serial do Excel (ex: 46344)
+        if (typeof rawVal === 'number' && !isNaN(rawVal)) {
+          if (rawVal < 20000 || rawVal > 80000) return null;
+          const utcDays = Math.floor(rawVal - 25569);
+          const dateObj = new Date(utcDays * 86400 * 1000 + 12 * 3600 * 1000);
+          if (isNaN(dateObj.getTime())) return null;
+          const y = dateObj.getUTCFullYear();
+          const m = String(dateObj.getUTCMonth() + 1).padStart(2, '0');
+          const d = String(dateObj.getUTCDate()).padStart(2, '0');
+          return `${y}-${m}-${d}`;
+        }
+
+        const str = String(rawVal).trim();
+        if (!str) return null;
+
+        // 3. Formato ISO: YYYY-MM-DD
+        const isoMatch = str.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
+        if (isoMatch) {
+          const y = parseInt(isoMatch[1], 10);
+          const m = parseInt(isoMatch[2], 10);
+          const d = parseInt(isoMatch[3], 10);
+          return isValidCalendarDate(y, m, d)
+            ? `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`
+            : null;
+        }
+
+        // 4. Formato Brasileiro: DD/MM/AAAA ou DD-MM-AAAA
+        const brMatch = str.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})/);
+        if (brMatch) {
+          const d = parseInt(brMatch[1], 10);
+          const m = parseInt(brMatch[2], 10);
+          const y = parseInt(brMatch[3], 10);
+          return isValidCalendarDate(y, m, d)
+            ? `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`
+            : null;
+        }
+
+        return null;
+      }
+
+      function parseOptionalNumeric(rawVal) {
+        // Campo numérico opcional: vazio assume padrão 0
+        if (rawVal === null || rawVal === undefined || String(rawVal).trim() === '') {
+          return { valid: true, value: 0 };
+        }
+
+        if (typeof rawVal === 'number') {
+          if (isNaN(rawVal)) return { valid: false, value: 0 };
+          return { valid: true, value: Number(rawVal.toFixed(4)) };
+        }
+
+        let cleaned = String(rawVal)
+          .trim()
+          .replace(/R\$/gi, '')
+          .replace(/\s+/g, '');
+
+        if (!cleaned) return { valid: true, value: 0 };
+
+        // Converte padrão monetário/numérico brasileiro (ex: "1.234,56" -> "1234.56")
+        if (cleaned.includes(',') && cleaned.includes('.')) {
+          if (cleaned.lastIndexOf(',') > cleaned.lastIndexOf('.')) {
+            cleaned = cleaned.replace(/\./g, '').replace(',', '.');
+          } else {
+            cleaned = cleaned.replace(/,/g, '');
+          }
+        } else if (cleaned.includes(',')) {
+          cleaned = cleaned.replace(',', '.');
+        }
+
+        const num = Number(cleaned);
+        if (isNaN(num)) {
+          return { valid: false, value: 0 };
+        }
+        return { valid: true, value: Number(num.toFixed(4)) };
+      }
+
+      function recomputeMappedData() {
+        const userEmail = currentUser ? currentUser.email : '';
+        const userId = currentUser ? currentUser.id : null;
+
+        let validCount = 0;
+        let invalidCount = 0;
+        let sumQty = 0;
+        let sumValor = 0;
+
+        processedRows = rawSheetRows.map((rawRow, idx) => {
+          const errors = [];
+
+          const rawDate = columnMapping.data_referencia ? rawRow[columnMapping.data_referencia] : '';
+          const rawColigada = columnMapping.codigo_coligada ? rawRow[columnMapping.codigo_coligada] : '';
+          const rawLoja = columnMapping.codigo_loja ? rawRow[columnMapping.codigo_loja] : '';
+          const rawSku = columnMapping.codigo_sku ? rawRow[columnMapping.codigo_sku] : '';
+          const rawCat = columnMapping.categoria ? rawRow[columnMapping.categoria] : '';
+          const rawQty = columnMapping.quantidade ? rawRow[columnMapping.quantidade] : '';
+          const rawVal = columnMapping.valor_total ? rawRow[columnMapping.valor_total] : '';
+
+          // Validação dos campos obrigatórios
+          const parsedDate = parseDateToISO(rawDate);
+          if (!parsedDate) {
+            errors.push('data_referencia inválida/vazia');
+          }
+
+          const lojaStr = String(rawLoja ?? '').trim();
+          if (!lojaStr) {
+            errors.push('codigo_loja obrigatório');
+          }
+
+          const skuStr = String(rawSku ?? '').trim();
+          if (!skuStr) {
+            errors.push('codigo_sku obrigatório');
+          }
+
+          // Campos opcionais de texto
+          const coligadaStr = String(rawColigada ?? '').trim() || null;
+          const catStr = String(rawCat ?? '').trim() || null;
+
+          // Campos opcionais numéricos (padrão 0)
+          const qtyResult = parseOptionalNumeric(rawQty);
+          if (!qtyResult.valid) {
+            errors.push('quantidade não numérica');
+          }
+
+          const valResult = parseOptionalNumeric(rawVal);
+          if (!valResult.valid) {
+            errors.push('valor_total não numérico');
+          }
+
+          const isValid = errors.length === 0;
+          if (isValid) {
+            validCount++;
+            sumQty += qtyResult.value;
+            sumValor += valResult.value;
+          } else {
+            invalidCount++;
+          }
+
+          return {
+            excelLineNumber: idx + 2,
+            isValid,
+            errors,
+            rawDateText: rawDate instanceof Date ? rawDate.toLocaleDateString('pt-BR') : String(rawDate ?? ''),
+            payload: {
+              data_referencia: parsedDate,
+              codigo_coligada: coligadaStr,
+              codigo_loja: lojaStr,
+              codigo_sku: skuStr,
+              categoria: catStr,
+              quantidade: qtyResult.value,
+              valor_total: valResult.value,
+              nome_arquivo: currentFileName,
+              inserido_por_id: userId,
+              inserido_por_email: userEmail
+            }
+          };
+        });
+
+        // Atualiza os 3 Cards de Métricas
+        document.getElementById('metricTotalRows').textContent = formatNumberBR(rawSheetRows.length);
+        document.getElementById('metricActiveSheetName').textContent = `Aba: ${activeSheetName}`;
+        document.getElementById('metricValidRows').textContent = formatNumberBR(validCount);
+        document.getElementById('metricValidTotals').textContent = `Qtd: ${formatNumberBR(sumQty)} • Valor: ${formatCurrencyBRL(sumValor)}`;
+        document.getElementById('metricInvalidRows').textContent = formatNumberBR(invalidCount);
+
+        const warningBadge = document.getElementById('previewWarningBadge');
+        if (invalidCount > 0) {
+          warningBadge.textContent = `${invalidCount} linha(s) com inconsistência serão ignoradas`;
+          warningBadge.classList.remove('hidden');
+        } else {
+          warningBadge.classList.add('hidden');
+        }
+
+        const importBtn = document.getElementById('confirmImportBtn');
+        const importBtnText = document.getElementById('confirmImportBtnText');
+        if (validCount === 0) {
+          importBtn.disabled = true;
+          importBtnText.textContent = 'Nenhuma linha válida para importar';
+        } else {
+          importBtn.disabled = false;
+          importBtnText.textContent = `Importar Registros Válidos (${formatNumberBR(validCount)})`;
+        }
+
+        renderPreviewTable();
+      }
+
+      function renderPreviewTable() {
+        const tbody = document.getElementById('previewTableBody');
+        tbody.innerHTML = '';
+
+        const firstTen = processedRows.slice(0, 10);
+
+        firstTen.forEach((row) => {
+          const p = row.payload;
+          const tr = document.createElement('tr');
+          tr.className = row.isValid
+            ? 'hover:bg-slate-50 transition'
+            : 'bg-rose-50/90 text-rose-950';
+
+          const statusBadge = row.isValid
+            ? '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-teal-50 text-[#0d9488] border border-teal-200">✓ Válida</span>'
+            : `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-300" title="${escapeHtml(row.errors.join(' | '))}">✕ ${escapeHtml(row.errors[0])}</span>`;
+
+          const dateCell = p.data_referencia
+            ? formatDateOnlyBR(p.data_referencia)
+            : `<span class="text-rose-700 font-bold underline">${escapeHtml(row.rawDateText || '(vazio)')}</span>`;
+
+          tr.innerHTML = `
+            <td class="py-2.5 px-3 font-mono text-slate-500">#${row.excelLineNumber}</td>
+            <td class="py-2.5 px-3 whitespace-nowrap">${statusBadge}</td>
+            <td class="py-2.5 px-3 whitespace-nowrap font-medium">${dateCell}</td>
+            <td class="py-2.5 px-3 whitespace-nowrap text-slate-600">${escapeHtml(p.codigo_coligada || '-')}</td>
+            <td class="py-2.5 px-3 whitespace-nowrap font-bold">${escapeHtml(p.codigo_loja || '-')}</td>
+            <td class="py-2.5 px-3 whitespace-nowrap font-mono">${escapeHtml(p.codigo_sku || '-')}</td>
+            <td class="py-2.5 px-3 whitespace-nowrap text-slate-600">${escapeHtml(p.categoria || '-')}</td>
+            <td class="py-2.5 px-3 whitespace-nowrap text-right font-semibold">${formatNumberBR(p.quantidade)}</td>
+            <td class="py-2.5 px-3 whitespace-nowrap text-right font-bold text-[#0f172a]">${formatCurrencyBRL(p.valor_total)}</td>
+            <td class="py-2.5 px-3 whitespace-nowrap text-slate-600">${escapeHtml(p.inserido_por_email)}</td>
+          `;
+
+          tbody.appendChild(tr);
+        });
+      }
+
+      // =======================================================================
+      // PASSO 4: ENVIO EM LOTES (BATCH INSERT DE 500 LINHAS) COM RASTREABILIDADE
+      // =======================================================================
+      async function executeBatchInsert() {
+        if (!supabaseClient || !currentUser) {
+          showToast('Sessão expirada. Faça login novamente antes de importar.');
+          return;
+        }
+
+        const recordsToInsert = processedRows
+          .filter((item) => item.isValid)
+          .map((item) => ({
+            ...item.payload,
+            nome_arquivo: currentFileName,
+            inserido_por_id: currentUser.id,
+            inserido_por_email: currentUser.email
+          }));
+
+        if (recordsToInsert.length === 0) {
+          showToast('Não há registros válidos para enviar.');
+          return;
+        }
+
+        const importBtn = document.getElementById('confirmImportBtn');
+        const importBtnText = document.getElementById('confirmImportBtnText');
+        const progressWrapper = document.getElementById('uploadProgressWrapper');
+        const progressLabel = document.getElementById('uploadProgressLabel');
+        const progressPct = document.getElementById('uploadProgressPct');
+        const progressBar = document.getElementById('uploadProgressBar');
+        const resultBanner = document.getElementById('uploadResultBanner');
+
+        importBtn.disabled = true;
+        importBtnText.textContent = 'Enviando lotes...';
+        progressWrapper.classList.remove('hidden');
+        resultBanner.classList.add('hidden');
+        progressBar.style.width = '5%';
+        progressPct.textContent = '5%';
+
+        const BATCH_SIZE = 500;
+        const totalBatches = Math.ceil(recordsToInsert.length / BATCH_SIZE);
+        let totalInserted = 0;
+
+        try {
+          for (let batchIndex = 0; batchIndex < totalBatches; batchIndex++) {
+            const start = batchIndex * BATCH_SIZE;
+            const end = start + BATCH_SIZE;
+            const batchSlice = recordsToInsert.slice(start, end);
+
+            progressLabel.textContent = `Enviando lote ${batchIndex + 1} de ${totalBatches} (${batchSlice.length} registros)...`;
+
+            const { error } = await supabaseClient
+              .from(TARGET_TABLE)
+              .insert(batchSlice);
+
+            if (error) {
+              throw error;
+            }
+
+            totalInserted += batchSlice.length;
+            const percent = Math.round(((batchIndex + 1) / totalBatches) * 100);
+            progressBar.style.width = percent + '%';
+            progressPct.textContent = percent + '%';
+          }
+
+          progressLabel.textContent = 'Importação finalizada com sucesso!';
+          resultBanner.className = 'rounded-xl p-4 text-xs leading-relaxed bg-teal-50 border border-teal-300 text-teal-950';
+          resultBanner.innerHTML = `
+            <div class="flex items-start gap-2.5">
+              <svg class="w-5 h-5 text-[#0d9488] shrink-0 mt-0.5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                <polyline points="20 6 9 17 4 12"></polyline>
+              </svg>
+              <div>
+                <p class="font-extrabold text-sm text-teal-900">
+                  Carga concluída! ${formatNumberBR(totalInserted)} registro(s) inserido(s) na tabela <code class="font-mono bg-white px-1.5 py-0.5 rounded">${escapeHtml(TARGET_TABLE)}</code>.
+                </p>
+                <p class="mt-1 text-teal-800">
+                  Rastreabilidade registrada: Operador <strong>${escapeHtml(currentUser.email)}</strong> (<code class="font-mono">${escapeHtml(currentUser.id)}</code>) • Arquivo: <strong>${escapeHtml(currentFileName)}</strong>.
+                </p>
+              </div>
+            </div>
+          `;
+          resultBanner.classList.remove('hidden');
+          showToast(`${totalInserted} registros importados com sucesso!`);
+
+          // Atualiza automaticamente o histórico auditado do operador
+          await loadAuditHistory();
+        } catch (err) {
+          console.error('Erro ao inserir lote no Supabase:', err);
+
+          let guidance = '';
+          const msg = (err.message || '').toLowerCase();
+          if (msg.includes('row-level security') || msg.includes('rls') || err.code === '42501') {
+            guidance = 'A política RLS da tabela bloqueou o INSERT. Confirme se seu usuário possui permissão de inserção vinculada ao próprio auth.uid().';
+          } else if (msg.includes('does not exist')) {
+            guidance = 'Verifique com a equipe de dados se a tabela e todas as colunas esperadas já existem no Supabase.';
+          }
+
+          resultBanner.className = 'rounded-xl p-4 text-xs leading-relaxed bg-rose-50 border border-rose-300 text-rose-950';
+          resultBanner.innerHTML = `
+            <p class="font-extrabold text-sm text-rose-900">
+              Erro durante a importação (${formatNumberBR(totalInserted)} registro(s) gravado(s) antes da falha)
+            </p>
+            <p class="mt-1 font-mono bg-white/80 p-2 rounded border border-rose-200 text-rose-800">${escapeHtml(err.message || 'Falha na requisição')}</p>
+            ${guidance ? `<p class="mt-1.5 font-semibold text-rose-900">${escapeHtml(guidance)}</p>` : ''}
+          `;
+          resultBanner.classList.remove('hidden');
+        } finally {
+          importBtn.disabled = false;
+          importBtnText.textContent = `Importar Registros Válidos (${formatNumberBR(recordsToInsert.length)})`;
+        }
+      }
+
+      // =======================================================================
+      // PASSO 5: HISTÓRICO RECENTE AUDITADO (ÚLTIMOS 15 REGISTROS DO OPERADOR)
+      // =======================================================================
+      async function loadAuditHistory() {
+        if (!supabaseClient || !currentUser) return;
+
+        const tbody = document.getElementById('historyTableBody');
+        const feedbackBox = document.getElementById('historyFeedbackBox');
+        const refreshIcon = document.getElementById('refreshHistoryIcon');
+
+        feedbackBox.classList.add('hidden');
+        if (refreshIcon) refreshIcon.classList.add('animate-spin-fast');
+
+        try {
+          const { data, error } = await supabaseClient
+            .from(TARGET_TABLE)
+            .select('*')
+            .eq('inserido_por_id', currentUser.id)
+            .order('id', { ascending: false })
+            .limit(15);
+
+          if (error) {
+            throw error;
+          }
+
+          if (!data || data.length === 0) {
+            tbody.innerHTML = `
+              <tr>
+                <td colspan="9" class="py-8 px-4 text-center text-slate-500">
+                  Nenhum registro importado por <strong>${escapeHtml(currentUser.email)}</strong> encontrado até o momento.
+                </td>
+              </tr>
+            `;
+            return;
+          }
+
+          tbody.innerHTML = '';
+          data.forEach((row) => {
+            const tr = document.createElement('tr');
+            tr.className = 'hover:bg-slate-50 transition';
+
+            const timestampVal = row.criado_em || row.inserido_em || row.created_at;
+
+            tr.innerHTML = `
+              <td class="py-3 px-3.5 whitespace-nowrap text-slate-600 font-medium">${formatDateTimeBR(timestampVal)}</td>
+              <td class="py-3 px-3.5 whitespace-nowrap font-semibold text-[#0f172a] max-w-[170px] truncate" title="${escapeHtml(row.nome_arquivo || '-')}">
+                ${escapeHtml(row.nome_arquivo || '-')}
+              </td>
+              <td class="py-3 px-3.5 whitespace-nowrap text-slate-700">${formatDateOnlyBR(row.data_referencia)}</td>
+              <td class="py-3 px-3.5 whitespace-nowrap text-slate-600">${escapeHtml(row.codigo_coligada || '-')}</td>
+              <td class="py-3 px-3.5 whitespace-nowrap font-bold text-[#0f172a]">${escapeHtml(row.codigo_loja || '-')}</td>
+              <td class="py-3 px-3.5 whitespace-nowrap font-mono text-slate-700">${escapeHtml(row.codigo_sku || '-')}</td>
+              <td class="py-3 px-3.5 whitespace-nowrap text-right font-semibold">${formatNumberBR(row.quantidade)}</td>
+              <td class="py-3 px-3.5 whitespace-nowrap text-right font-bold text-[#2563eb]">${formatCurrencyBRL(row.valor_total)}</td>
+              <td class="py-3 px-3.5 whitespace-nowrap">
+                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-teal-50 text-teal-800 border border-teal-200">
+                  ${escapeHtml(row.inserido_por_email || currentUser.email)}
+                </span>
+              </td>
+            `;
+            tbody.appendChild(tr);
+          });
+        } catch (err) {
+          tbody.innerHTML = `
+            <tr>
+              <td colspan="9" class="py-6 px-4 text-center text-slate-400">
+                Não foi possível exibir o histórico recente no momento.
+              </td>
+            </tr>
+          `;
+          feedbackBox.className = 'm-4 rounded-xl p-3.5 text-xs bg-amber-50 border border-amber-200 text-amber-900';
+          feedbackBox.textContent = 'Aviso ao consultar histórico auditado: ' + (err.message || 'Erro de consulta');
+          feedbackBox.classList.remove('hidden');
+        } finally {
+          if (refreshIcon) refreshIcon.classList.remove('animate-spin-fast');
+        }
+      }
+
+      function resetFileSelection() {
+        activeWorkbook = null;
+        activeSheetName = '';
+        rawSheetRows = [];
+        detectedHeaders = [];
+        currentFileName = '';
+        columnMapping = {};
+        processedRows = [];
+
+        document.getElementById('fileInput').value = '';
+        document.getElementById('selectedFileBadge').classList.add('hidden');
+        document.getElementById('resetFileBtn').classList.add('hidden');
+        document.getElementById('sheetSelectorContainer').classList.add('hidden');
+        document.getElementById('stagingWorkspace').classList.add('hidden');
+        document.getElementById('fileParseErrorBox').classList.add('hidden');
+      }
+
+      // =======================================================================
+      // REGISTRO DE EVENTOS DA INTERFACE
+      // =======================================================================
+      function bindUIEvents() {
+        // Submissão do Formulário de Login
+        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+          e.preventDefault();
+          clearLoginError();
+
+          if (!isProductionConfigured() || !supabaseClient) {
+            showLoginError('Portal aguardando configuração das constantes SUPABASE_URL e SUPABASE_ANON_KEY no arquivo HTML.');
+            document.getElementById('placeholderConfigAlert').classList.remove('hidden');
+            return;
+          }
+
+          const email = document.getElementById('loginEmail').value.trim();
+          const password = document.getElementById('loginPassword').value;
+
+          if (!email || !password) {
+            showLoginError('Informe seu e-mail corporativo e senha para continuar.');
+            return;
+          }
+
+          const submitBtn = document.getElementById('loginSubmitBtn');
+          const spinner = document.getElementById('loginBtnSpinner');
+          const btnText = document.getElementById('loginBtnText');
+
+          submitBtn.disabled = true;
+          spinner.classList.remove('hidden');
+          btnText.textContent = 'Autenticando...';
+
+          try {
+            const { data, error } = await supabaseClient.auth.signInWithPassword({
+              email,
+              password
+            });
+
+            if (error) {
+              throw error;
+            }
+
+            if (data && data.user) {
+              setAuthenticatedView(data.user);
+              showToast('Sessão iniciada com sucesso!');
+            }
+          } catch (err) {
+            showLoginError(translateAuthError(err.message));
+          } finally {
+            submitBtn.disabled = false;
+            spinner.classList.add('hidden');
+            btnText.textContent = 'Entrar no Portal';
+          }
+        });
+
+        // Botão Sair (Logout)
+        document.getElementById('logoutBtn').addEventListener('click', async () => {
+          if (!supabaseClient) return;
+          try {
+            await supabaseClient.auth.signOut();
+            resetFileSelection();
+            setUnauthenticatedView();
+            showToast('Sessão encerrada com segurança.');
+          } catch (err) {
+            showToast('Erro ao encerrar sessão: ' + err.message);
+          }
+        });
+
+        // Download Planilha Modelo
+        document.getElementById('downloadTemplateBtn').addEventListener('click', downloadSampleTemplate);
+
+        // Drag & Drop e Input de Arquivo
+        const dropZone = document.getElementById('dropZone');
+        const fileInput = document.getElementById('fileInput');
+
+        dropZone.addEventListener('click', () => fileInput.click());
+
+        dropZone.addEventListener('dragover', (e) => {
+          e.preventDefault();
+          dropZone.classList.add('dropzone-active');
+        });
+
+        dropZone.addEventListener('dragleave', () => {
+          dropZone.classList.remove('dropzone-active');
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+          e.preventDefault();
+          dropZone.classList.remove('dropzone-active');
+          if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+            handleFileSelected(e.dataTransfer.files[0]);
+          }
+        });
+
+        fileInput.addEventListener('change', (e) => {
+          if (e.target.files && e.target.files.length > 0) {
+            handleFileSelected(e.target.files[0]);
+          }
+        });
+
+        // Seletor de Aba do Excel
+        document.getElementById('sheetSelector').addEventListener('change', (e) => {
+          loadWorksheetByName(e.target.value);
+        });
+
+        // Trocar / Limpar Arquivo
+        document.getElementById('resetFileBtn').addEventListener('click', resetFileSelection);
+
+        // Botão Importar Registros Válidos
+        document.getElementById('confirmImportBtn').addEventListener('click', executeBatchInsert);
+
+        // Botão Atualizar Histórico
+        document.getElementById('refreshHistoryBtn').addEventListener('click', loadAuditHistory);
+      }
+
+      document.addEventListener('DOMContentLoaded', () => {
+        bindUIEvents();
+        initSupabase();
+      });
+    })();
+  </script>
+</body>
+</html>
